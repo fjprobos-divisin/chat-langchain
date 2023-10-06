@@ -3,10 +3,11 @@ import logging
 import os
 import re
 from parser import langchain_docs_extractor
+import sys
 
 import weaviate
 from bs4 import BeautifulSoup, SoupStrainer
-from langchain.document_loaders import RecursiveUrlLoader, SitemapLoader
+from langchain.document_loaders import RecursiveUrlLoader, SitemapLoader,PyPDFLoader
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.indexes import SQLRecordManager, index
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -15,6 +16,7 @@ from langchain.vectorstores import Weaviate
 
 from constants import WEAVIATE_DOCS_INDEX_NAME
 
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 WEAVIATE_URL = os.environ["WEAVIATE_URL"]
@@ -36,18 +38,23 @@ def metadata_extractor(meta: dict, soup: BeautifulSoup) -> dict:
 
 
 def load_langchain_docs():
-    return SitemapLoader(
+    sitemaploader = SitemapLoader(
         "https://python.langchain.com/sitemap.xml",
         filter_urls=["https://python.langchain.com/"],
         parsing_function=langchain_docs_extractor,
         default_parser="lxml",
+        verify_ssl=False,
         bs_kwargs={
             "parse_only": SoupStrainer(
                 name=("article", "title", "html", "lang", "content")
             ),
         },
         meta_function=metadata_extractor,
-    ).load()
+    )
+
+    sitemaploader.requests_kwargs = {"verify": False}
+
+    return sitemaploader.load()
 
 
 def simple_extractor(html: str) -> str:
@@ -58,11 +65,10 @@ def simple_extractor(html: str) -> str:
 def load_api_docs():
     return RecursiveUrlLoader(
         url="https://api.python.langchain.com/en/latest/",
-        max_depth=8,
+        max_depth=2,
         extractor=simple_extractor,
         prevent_outside=True,
-        use_async=True,
-        timeout=600,
+        timeout=100,
         # Drop trailing / to avoid duplicate pages.
         link_regex=(
             f"href=[\"']{PREFIXES_TO_IGNORE_REGEX}((?:{SUFFIXES_TO_IGNORE_REGEX}.)*?)"
@@ -76,32 +82,47 @@ def load_api_docs():
     ).load()
 
 
+def load_chmc_docs():
+    files = [file for file in os.listdir('reports') if os.path.isfile(os.path.join('reports', file))]
+    loaded_files = []
+    for file in files:
+        loaded_files += PyPDFLoader('reports/'+file).load_and_split()
+    return loaded_files
+
+
 def ingest_docs():
-    docs_from_documentation = load_langchain_docs()
-    logger.info(f"Loaded {len(docs_from_documentation)} docs from documentation")
-    docs_from_api = load_api_docs()
-    logger.info(f"Loaded {len(docs_from_api)} docs from API")
+    # docs_from_documentation = load_langchain_docs()
+    # logger.info(f"Loaded {len(docs_from_documentation)} docs from documentation")
+    # docs_from_api = load_api_docs()
+    # logger.info(f"Loaded {len(docs_from_api)} docs from API")
+    docs_from_chmc = load_chmc_docs()
+    logger.info(f"Loaded {len(docs_from_chmc)} docs from CHMC reports")
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
     docs_transformed = text_splitter.split_documents(
-        docs_from_documentation + docs_from_api
+        # docs_from_documentation + docs_from_api
+        docs_from_chmc
     )
+    for doc in docs_from_chmc:
+        doc.metadata["file"] = doc.metadata["source"]
+        doc.metadata["source"] = doc.metadata["file"] + "_" + str(doc.metadata["page"])
 
     # We try to return 'source' and 'title' metadata when querying vector store and
     # Weaviate will error at query time if one of the attributes is missing from a
     # retrieved document.
-    for doc in docs_transformed:
-        if "source" not in doc.metadata:
-            doc.metadata["source"] = ""
-        if "title" not in doc.metadata:
-            doc.metadata["title"] = ""
+    # for doc in docs_transformed:
+    #    if "source" not in doc.metadata:
+    #        doc.metadata["source"] = ""
+    #    if "title" not in doc.metadata:
+    #        doc.metadata["title"] = ""
 
     client = weaviate.Client(
         url=WEAVIATE_URL,
         auth_client_secret=weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY),
     )
     embedding = OpenAIEmbeddings(
-        chunk_size=200,
+        chunk_size=10000,
+        # chunk_size = 200
     )  # rate limit
     vectorstore = Weaviate(
         client=client,
@@ -109,7 +130,8 @@ def ingest_docs():
         text_key="text",
         embedding=embedding,
         by_text=False,
-        attributes=["source", "title"],
+        # attributes=["source", "title"],
+        attributes=["source", "page", "file"],
     )
 
     record_manager = SQLRecordManager(
@@ -118,7 +140,8 @@ def ingest_docs():
     record_manager.create_schema()
 
     indexing_stats = index(
-        docs_transformed,
+        # docs_transformed,
+        docs_from_chmc,
         record_manager,
         vectorstore,
         cleanup="full",

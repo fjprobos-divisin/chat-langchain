@@ -37,13 +37,16 @@ export type Feedback = {
 
 const filterSources = (sources: Source[]) => {
   const filtered: Source[] = [];
-  const urlMap = new Map<string, number>();
+  const keyMap = new Map<string, number>();
   const indexMap = new Map<number, number>();
+
   sources.forEach((source, i) => {
-    const { url } = source;
-    const index = urlMap.get(url);
+    // Use both file and page properties to create a unique key
+    const key = `${source.file}-${source.page}`;
+
+    const index = keyMap.get(key);
     if (index === undefined) {
-      urlMap.set(url, i);
+      keyMap.set(key, i);
       indexMap.set(i, filtered.length);
       filtered.push(source);
     } else {
@@ -53,8 +56,10 @@ const filterSources = (sources: Source[]) => {
       }
     }
   });
+
   return { filtered, indexMap };
 };
+
 
 const createAnswerElements = (
   content: string,

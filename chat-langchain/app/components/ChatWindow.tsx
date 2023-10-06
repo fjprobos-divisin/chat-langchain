@@ -40,6 +40,7 @@ export function ChatWindow(props: {
   const { placeholder, titleText = "An LLM" } = props;
 
   const sendMessage = async (message?: string) => {
+    // debugger;
     if (messageContainerRef.current) {
       messageContainerRef.current.classList.add("grow");
     }
@@ -164,6 +165,7 @@ export function ChatWindow(props: {
   };
 
   const sendInitialQuestion = async (question: string) => {
+    // debugger;
     await sendMessage(question);
   };
 
@@ -173,9 +175,6 @@ export function ChatWindow(props: {
         <Flex direction={"column"} alignItems={"center"} paddingBottom={"20px"}>
           <Heading fontSize="2xl" fontWeight={"medium"} mb={1} color={"white"}>
             {titleText}
-          </Heading>
-          <Heading fontSize="md" fontWeight={"normal"} mb={1} color={"white"}>
-            We appreciate feedback!
           </Heading>
         </Flex>
       )}
@@ -204,7 +203,7 @@ export function ChatWindow(props: {
           value={input}
           maxRows={5}
           rounded={"md"}
-          placeholder="What is LangChain Expression Language?"
+          placeholder="What is the housing gap in Canada?"
           textColor={"white"}
           borderColor={"rgb(58, 58, 61)"}
           onChange={(e) => setInput(e.target.value)}

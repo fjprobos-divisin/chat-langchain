@@ -27,11 +27,11 @@ from pydantic import BaseModel
 from constants import WEAVIATE_DOCS_INDEX_NAME
 
 RESPONSE_TEMPLATE = """\
-You are an expert programmer and problem-solver, tasked with answering any question \
-about Langchain.
+You are an expert real estate analyst, tasked with answering any question \
+about CHMC reports.
 
 Generate a comprehensive and informative answer of 80 words or less for the \
-given question based solely on the provided search results (URL and content). You must \
+given question based solely on the provided search results (files, pages and content). You must \
 only use information from the provided search results. Use an unbiased and \
 journalistic tone. Combine search results together into a coherent answer. Do not \
 repeat text. Cite search results using [${{number}}] notation. Only cite the most \
@@ -94,9 +94,9 @@ def get_retriever() -> BaseRetriever:
         text_key="text",
         embedding=OpenAIEmbeddings(chunk_size=200),
         by_text=False,
-        attributes=["source", "title"],
+        attributes=["source", "page", "file"],
     )
-    return weaviate_client.as_retriever(search_kwargs=dict(k=6))
+    return weaviate_client.as_retriever(search_kwargs=dict(k=4))
 
 
 def create_retriever_chain(
@@ -167,8 +167,9 @@ async def transform_stream_for_client(
             if op["path"] == "/logs/0/final_output":
                 all_sources = [
                     {
-                        "url": doc.metadata["source"],
-                        "title": doc.metadata["title"],
+                        "source": doc.metadata["source"],
+                        "page": doc.metadata["page"],
+                        "file": doc.metadata["file"],
                     }
                     for doc in op["value"]["output"]
                 ]

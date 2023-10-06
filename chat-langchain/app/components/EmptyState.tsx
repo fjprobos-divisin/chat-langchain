@@ -16,7 +16,7 @@ export function EmptyState(props: { onChoice: (question: string) => any }) {
   return (
     <div className="rounded flex flex-col items-center max-w-full md:p-8">
       <Heading fontSize="3xl" fontWeight={"medium"} mb={1} color={"white"}>
-        Chat LangChain 🦜🔗
+        Chat CHMC 🏙
       </Heading>
       <Heading
         fontSize="xl"
@@ -26,10 +26,7 @@ export function EmptyState(props: { onChoice: (question: string) => any }) {
         marginTop={"10px"}
         textAlign={"center"}
       >
-        Ask me anything about LangChain&apos;s{" "}
-        <Link href="https://python.langchain.com/" color={"blue.200"}>
-          Python documentation!
-        </Link>
+        Ask me anything about CHMC
       </Heading>
       <Flex marginTop={"25px"} grow={1} maxWidth={"800px"} width={"100%"}>
         <Card
@@ -48,7 +45,7 @@ export function EmptyState(props: { onChoice: (question: string) => any }) {
               color={"gray.200"}
               textAlign={"center"}
             >
-              How do I use a RecursiveUrlLoader to load content from a page?
+              What is the projected housing stock in Alberta?
             </Heading>
           </CardHeader>
         </Card>
@@ -69,7 +66,7 @@ export function EmptyState(props: { onChoice: (question: string) => any }) {
               color={"gray.200"}
               textAlign={"center"}
             >
-              What is LangChain Expression Language?
+              What is the housing need in British Columbia?
             </Heading>
           </CardHeader>
         </Card>
@@ -91,7 +88,7 @@ export function EmptyState(props: { onChoice: (question: string) => any }) {
               color={"gray.200"}
               textAlign={"center"}
             >
-              What are some ways of doing retrieval augmented generation?
+              Which is the most affected province by the housing shortage?
             </Heading>
           </CardHeader>
         </Card>
@@ -112,7 +109,7 @@ export function EmptyState(props: { onChoice: (question: string) => any }) {
               color={"gray.200"}
               textAlign={"center"}
             >
-              How do I run a model locally?
+              Can you give me an overview about housing in Canada?
             </Heading>
           </CardHeader>
         </Card>
