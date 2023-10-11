@@ -96,7 +96,7 @@ def get_retriever() -> BaseRetriever:
         by_text=False,
         attributes=["source", "page", "file"],
     )
-    return weaviate_client.as_retriever(search_kwargs=dict(k=4))
+    return weaviate_client.as_retriever(search_kwargs=dict(k=8))
 
 
 def create_retriever_chain(
@@ -261,6 +261,10 @@ async def update_feedback(request: Request):
         comment=data.get("comment"),
     )
     return {"result": "patched feedback successfully", "code": 200}
+
+@app.get("/ping")
+def pong():
+    return {"ping": "pong!"}
 
 
 # TODO: Update when async API is available
