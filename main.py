@@ -26,6 +26,16 @@ from pydantic import BaseModel
 
 from constants import WEAVIATE_DOCS_INDEX_NAME
 
+# This part of the prompt was left behind to avoid problems with citing after sources post processing
+# Should be placed after "Do not repeat text."
+CITING_PROMPT = """
+Cite search results using [${{number}}] notation. Only cite the most \
+relevant results that answer the question accurately. Place these citations at the end \
+of the sentence or paragraph that reference them - do not put them all at the end. If \
+different results refer to different entities within the same name, write separate \
+answers for each entity.
+"""
+
 RESPONSE_TEMPLATE = """\
 You are an expert real estate analyst, tasked with answering any question \
 about CHMC reports.
@@ -34,11 +44,7 @@ Generate a comprehensive and informative answer of 80 words or less for the \
 given question based solely on the provided search results (files, pages and content). You must \
 only use information from the provided search results. Use an unbiased and \
 journalistic tone. Combine search results together into a coherent answer. Do not \
-repeat text. Cite search results using [${{number}}] notation. Only cite the most \
-relevant results that answer the question accurately. Place these citations at the end \
-of the sentence or paragraph that reference them - do not put them all at the end. If \
-different results refer to different entities within the same name, write separate \
-answers for each entity.
+repeat text.
 
 If there is nothing in the context relevant to the question at hand, just say "Hmm, \
 I'm not sure." Don't try to make up an answer.
@@ -64,6 +70,11 @@ Chat History:
 {chat_history}
 Follow Up Input: {question}
 Standalone Question:"""
+
+# Load json with reports metadata
+with open('reports_metadata.json', 'r') as f:
+    data_list = json.load(f)
+metadata_dict = {item["file"]: item for item in data_list}
 
 
 client = Client()
@@ -130,6 +141,12 @@ def format_docs(docs: Sequence[Document]) -> str:
     return "\n".join(formatted_docs)
 
 
+def remove_prefix(s, prefix):
+    if s.startswith(prefix):
+        return s[len(prefix):]
+    return s
+
+
 def create_chain(
     llm: BaseLanguageModel,
     retriever: BaseRetriever,
@@ -159,20 +176,58 @@ def create_chain(
     return _context | response_synthesizer
 
 
+def create_test_chain(
+    llm: BaseLanguageModel,
+    retriever: BaseRetriever,
+) -> Runnable:
+    retriever_chain = create_retriever_chain(
+        llm, retriever, use_chat_history=False
+    ).with_config(run_name="FindDocs")
+    _context = RunnableMap(
+        {
+            "context": retriever_chain | format_docs,
+            "question": itemgetter("question"),
+        }
+    ).with_config(run_name="RetrieveDocs")
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", RESPONSE_TEMPLATE),
+            ("human", "{question}"),
+        ]
+    )
+
+    response_synthesizer = (prompt | llm | StrOutputParser()).with_config(
+        run_name="GenerateResponse",
+    )
+    return _context | response_synthesizer
+
+
 async def transform_stream_for_client(
     stream: AsyncIterator[RunLogPatch],
 ) -> AsyncIterator[str]:
     async for chunk in stream:
         for op in chunk.ops:
             if op["path"] == "/logs/0/final_output":
-                all_sources = [
-                    {
-                        "source": doc.metadata["source"],
-                        "page": doc.metadata["page"],
-                        "file": doc.metadata["file"],
-                    }
-                    for doc in op["value"]["output"]
-                ]
+                seen_sources = set()
+                all_sources = []
+
+                for doc in op["value"]["output"]:
+                    current_source = doc.metadata["source"]
+                    if current_source not in seen_sources and doc.metadata.get("file"):
+                        seen_sources.add(current_source)
+
+                        source_info = {
+                            "source": current_source,
+                            # "page": doc.metadata["page"],
+                            "file": doc.metadata["file"],
+                            "name": metadata_dict[remove_prefix(doc.metadata["file"], prefix="reports/")].get("name"),
+                            "author": metadata_dict[remove_prefix(doc.metadata["file"], prefix="reports/")].get(
+                                "author"),
+                            "date_published": metadata_dict[remove_prefix(doc.metadata["file"], prefix="reports/")].get(
+                                "date_published")
+                        }
+                        all_sources.append(source_info)
+
                 if all_sources:
                     src = {"sources": all_sources}
                     yield f"{json.dumps(src)}\n"

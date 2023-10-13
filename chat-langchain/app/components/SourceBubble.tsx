@@ -7,6 +7,9 @@ export type Source = {
   title: string;
   file:  string;
   page: number;
+  author: string;
+  date_published: string;
+  name: string;
 };
 
 export function SourceBubble({
@@ -45,9 +48,9 @@ export function SourceBubble({
     >
       <CardBody>
         <Heading size={"sm"} fontWeight={"normal"} color={"white"}>
-          File: {source.file} 
+          Name: {source.name} 
           <br />
-          Page {source.page}
+          date {source.date_published}
         </Heading>
       </CardBody>
     </Card>
