@@ -12,23 +12,24 @@ from main import get_retriever, create_test_chain
 
 MODEL_NAME = "gpt-3.5-turbo"
 client = Client()
-# datasets = [d for d in client.list_datasets()]
-# print(datasets)
+upload_dataset = False
+default_dataset = 'cmhc-full-2023-10-16'
 
 
 def create_dataset():
     """
-    Create a dataset using
+    Create a dataset using csv input
     """
-    today = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-    dataset_name = "cmhc-" + today
+    df_testing_set = pd.read_csv('CMHC Publications - tests.csv')
+    df_testing_set = df_testing_set[df_testing_set.iloc[:, 0].notna()]
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    dataset_name = "cmhc-full-" + today
+
     try:
         dataset = client.create_dataset(dataset_name=dataset_name)
     except ValueError:
         return dataset_name
-
-    df_testing_set = pd.read_csv('CMHC Publications - tests.csv')
-    df_testing_set = df_testing_set[df_testing_set.iloc[:, 0].notna()]
 
     for index, row in df_testing_set.iterrows():
         client.create_example(
@@ -48,7 +49,10 @@ def create_dataset():
 
 classifier_llm = ChatOpenAI(temperature=0, model_name=MODEL_NAME)
 
-dataset_name = create_dataset()
+if upload_dataset:
+    dataset_name = create_dataset()
+else:
+    dataset_name = default_dataset
 
 eval_config = RunEvalConfig(
     evaluators=["qa"],
@@ -77,7 +81,7 @@ results = run_on_dataset(
     evaluation=eval_config,
     verbose=True,
     concurrency_level=1,
-    project_name=os.getenv('LANGCHAIN_PROJECT')
+    project_name=os.getenv('LANGCHAIN_PROJECT')+"-eval-"+datetime.now().strftime("%Y-%m-%d-%H%M%S")
 )
 
 print("-" * 50)
